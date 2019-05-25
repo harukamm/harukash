@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <iostream>
 #include <sstream>
 #include <stdio.h>
@@ -8,24 +9,35 @@
 
 using namespace std;
 
+struct parsed_obj {
+  vector<string> token;
+  vector<string> redirect;
+};
+
 void print_prompt() {
   cout << "^_^ > ";
 }
 
-vector<string> split(const string& s, char sep) {
-  vector<string> elems;
+bool is_redirect_token(const string& s) {
+  // TODO: Fix it.
+  return s.find('<') != string::npos || s.find('>') != string::npos;
+}
+
+parsed_obj parse(const string& s) {
+  char sep = ' ';
+  parsed_obj* obj = new parsed_obj();
   stringstream ss(s);
   string item;
   while (getline(ss, item, sep)) {
     if (!item.empty()) {
-      elems.push_back(item);
+      if (is_redirect_token(item)) {
+        obj->redirect.push_back(item);
+      } else {
+        obj->token.push_back(item);
+      }
     }
   }
-  return elems;
-}
-
-vector<string> parse(string& s) {
-  return split(s, ' ');
+  return *obj;
 }
 
 char** c_str_arr(const vector<string>& arr) {
@@ -47,30 +59,32 @@ void builtin_echo(const vector<string>& tokens) {
   cout << endl;
 }
 
-bool handle_builtin(const vector<string>& tokens) {
-  if (tokens.size() == 0) {
+bool handle_builtin(const parsed_obj& obj) {
+  if (obj.token.size() == 0) {
     return false;
   }
-  const string& first = tokens.at(0);
+  assert(obj.redirect.size() == 0);
+  const string& first = obj.token.at(0);
   if (first == "echo") {
-    builtin_echo(tokens);
+    builtin_echo(obj.token);
     return true;
   }
   return false;
 }
 
-bool handle_command(const vector<string>& tokens) {
-  if (tokens.size() == 0) {
+bool handle_command(const parsed_obj& obj) {
+  if (obj.token.size() == 0) {
     return false;
   }
 
+  assert(obj.redirect.size() == 0);
   pid_t pid = fork();
   if (pid < 0) { // When `fork` failed.
     perror("Fork failed.");
     exit(-1);
   } else if (pid == 0) { // For child process.
-    const string& command = tokens[0];
-    char** args = c_str_arr(tokens);
+    const string& command = obj.token[0];
+    char** args = c_str_arr(obj.token);
     execvp(command.c_str(), args);
     // cerr << strerror(errno);
     perror("Exec failed.");
@@ -97,15 +111,15 @@ int main() {
 
     string s;
     getline(cin, s);
-    const vector<string>& tokens = parse(s);
+    const parsed_obj& obj = parse(s);
 
-    if (tokens.size() == 0) {
+    if (obj.token.size() == 0) {
       continue;
     }
-    if (handle_builtin(tokens)) {
+    if (handle_builtin(obj)) {
       continue;
     }
-    if (handle_command(tokens)) {
+    if (handle_command(obj)) {
       continue;
     }
 
