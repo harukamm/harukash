@@ -22,7 +22,7 @@ struct redirect_exp {
 struct parsed_obj {
   vector<string> token;
   vector<redirect_exp> redirect;
-  map<string, int>* fdmap;
+  map<string, int> fdmap;
 };
 
 void print_prompt() {
@@ -75,23 +75,19 @@ void dupall(const vector<redirect_exp>& redirect) {
   }
 }
 
-parsed_obj parse(const string& s) {
+void parse(const string& s, parsed_obj* obj) {
   char sep = ' ';
-  parsed_obj* obj = new parsed_obj();
-  map<string, int>* fdmap = new map<string, int>();
-  obj->fdmap = fdmap;
   stringstream ss(s);
   string item;
   while (getline(ss, item, sep)) {
     if (!item.empty()) {
       if (is_redirect_token(item)) {
-        obj->redirect.push_back(parse_and_open_redirect(item, fdmap));
+        obj->redirect.push_back(parse_and_open_redirect(item, &obj->fdmap));
       } else {
         obj->token.push_back(item);
       }
     }
   }
-  return *obj;
 }
 
 char** c_str_arr(const vector<string>& arr) {
@@ -145,7 +141,7 @@ bool handle_command(const parsed_obj& obj) {
     exit(-1);
   }
 
-  close_files(*obj.fdmap);
+  close_files(obj.fdmap);
   int status;
   pid_t r = waitpid(pid, &status, 0); // Wait for child process.
   if (r < 0) {
@@ -166,7 +162,8 @@ int main() {
 
     string s;
     getline(cin, s);
-    const parsed_obj& obj = parse(s);
+    parsed_obj obj;
+    parse(s, &obj);
 
     if (obj.token.size() == 0) {
       continue;
