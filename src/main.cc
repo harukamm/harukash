@@ -1,3 +1,6 @@
+#include "data.h"
+#include "util.h"
+
 #include <assert.h>
 #include <iostream>
 #include <map>
@@ -5,21 +8,9 @@
 #include <sstream>
 #include <stdio.h>
 #include <string>
-#include "util.h"
 #include <vector>
 
 using namespace std;
-
-struct redirect_exp {
-  int from;
-  int to;
-};
-
-struct parsed_obj {
-  vector<string> token;
-  vector<redirect_exp> redirect;
-  map<string, int> fdmap;
-};
 
 template<typename T>
 ostream& operator<< (ostream& out, const vector<T>& v) {
@@ -44,7 +35,7 @@ bool is_redirect_token(const string& s) {
   return s.find('<') != string::npos || s.find('>') != string::npos;
 }
 
-redirect_exp parse_and_open_redirect(const string& s, map<string, int>* m) {
+CommandData::redirect_pair parse_and_open_redirect(const string& s, map<string, int>* m) {
   assert(m != nullptr);
   // Currently only support `1>some-file`
   smatch results;
@@ -53,10 +44,10 @@ redirect_exp parse_and_open_redirect(const string& s, map<string, int>* m) {
   if (m->find(fname) == m->end()) {
     m->insert(make_pair(fname, Util::sysopen(fname)));
   }
-  return (redirect_exp){.from=1, .to=m->at(fname)};
+  return (CommandData::redirect_pair){.from=1, .to=m->at(fname)};
 }
 
-void parse(const string& s, parsed_obj* obj) {
+void parse(const string& s, CommandData* obj) {
   char sep = ' ';
   stringstream ss(s);
   string item;
@@ -71,8 +62,8 @@ void parse(const string& s, parsed_obj* obj) {
   }
 }
 
-void separate_parsed_obj(const parsed_obj& src, parsed_obj* dest1,
-    parsed_obj* dest2) {
+void separate_command(const CommandData& src, CommandData* dest1,
+    CommandData* dest2) {
   assert(dest1 != nullptr);
   assert(dest2 != nullptr);
 
@@ -97,7 +88,7 @@ void builtin_echo(const vector<string>& tokens) {
   cout << endl;
 }
 
-bool handle_builtin(const parsed_obj& obj) {
+bool handle_builtin(const CommandData& obj) {
   if (obj.token.size() == 0) {
     return false;
   }
@@ -110,7 +101,7 @@ bool handle_builtin(const parsed_obj& obj) {
   return false;
 }
 
-bool handle_command_with_pipe(const parsed_obj& obj) {
+bool handle_command_with_pipe(const CommandData& obj) {
   const vector<string>& token = obj.token;
   int cnt = count(token.begin(), token.end(), "|");
   if (cnt == 0) {
@@ -120,8 +111,8 @@ bool handle_command_with_pipe(const parsed_obj& obj) {
   // TODO: redirect 先をパイプごとに分けないと
   assert(obj.redirect.size() == 0);
 
-  parsed_obj obj1, obj2;
-  separate_parsed_obj(obj, &obj1, &obj2);
+  CommandData obj1, obj2;
+  separate_command(obj, &obj1, &obj2);
 
   int fds[2];
   Util::syspipe(fds);
@@ -152,7 +143,7 @@ bool handle_command_with_pipe(const parsed_obj& obj) {
   return Util::syswaitpid(pid1) && Util::syswaitpid(pid2);
 }
 
-bool handle_command(const parsed_obj& obj) {
+bool handle_command(const CommandData& obj) {
   if (obj.token.size() == 0) {
     return false;
   }
@@ -180,7 +171,7 @@ int main() {
 
     string s;
     getline(cin, s);
-    parsed_obj obj;
+    CommandData obj;
     parse(s, &obj);
 
     if (obj.token.size() == 0) {
