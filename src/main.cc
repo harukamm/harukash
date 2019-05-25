@@ -55,23 +55,31 @@ redirect_exp parse_and_open_redirect(const string& s, map<string, int>* m) {
   return (redirect_exp){.from=1, .to=m->at(fname)};
 }
 
+void close_wrap(int fd) {
+  if (close(fd) == -1) {
+    perror("close failed");
+    exit(-1);
+  }
+}
+
 void close_files(const map<string, int>& m) {
   for (const auto &pair: m) {
-    int st = close(pair.second);
-    if (st == -1) {
-      perror("close failed");
-      exit(-1);
-    }
+    close_wrap(pair.second);
+  }
+}
+
+void dup_wrap(int to, int from) {
+  // Call dup_wrap(2, 1) if 1>&2
+  int fd = dup2(to, from);
+  if (fd == -1) {
+    perror("dup2 failed");
+    exit(-1);
   }
 }
 
 void dupall(const vector<redirect_exp>& redirect) {
   for (const auto &r: redirect) {
-    int fd = dup2(r.to, r.from);
-    if (fd == -1) {
-      perror("dup2 failed");
-      exit(-1);
-    }
+    dup_wrap(r.to, r.from);
   }
 }
 
@@ -90,6 +98,22 @@ void parse(const string& s, parsed_obj* obj) {
   }
 }
 
+void separate_parsed_obj(const parsed_obj& src, parsed_obj* dest1,
+    parsed_obj* dest2) {
+  assert(dest1 != nullptr);
+  assert(dest2 != nullptr);
+
+  auto it = find(src.token.begin(), src.token.end(), "|");
+  copy(src.token.begin(), it, back_inserter(dest1->token));
+  copy(it + 1, src.token.end(), back_inserter(dest2->token));
+
+  copy(src.redirect.begin(), src.redirect.end(), back_inserter(dest1->redirect));
+  copy(src.redirect.begin(), src.redirect.end(), back_inserter(dest2->redirect));
+
+  dest1->fdmap.insert(src.fdmap.begin(), src.fdmap.end());
+  dest2->fdmap.insert(src.fdmap.begin(), src.fdmap.end());
+}
+
 char** c_str_arr(const vector<string>& arr) {
   char** args = new char*[arr.size() + 1];
   for (int i = 0; i < arr.size(); i++) {
@@ -97,6 +121,16 @@ char** c_str_arr(const vector<string>& arr) {
   }
   args[arr.size()] = nullptr;
   return args;
+}
+
+void exec_command(const parsed_obj& obj) {
+  const vector<string>& token = obj.token;
+  const string& command = token[0];
+  char** args = c_str_arr(token);
+  dupall(obj.redirect);
+  execvp(command.c_str(), args);
+  perror("Exec failed");
+  exit(-1);
 }
 
 void builtin_echo(const vector<string>& tokens) {
@@ -122,6 +156,13 @@ bool handle_builtin(const parsed_obj& obj) {
   return false;
 }
 
+void check_fork_failure(pid_t pid) {
+  if (pid < 0) {
+    perror("Fork failed");
+    exit(-1);
+  }
+}
+
 bool wait_pid(pid_t pid) {
   int status;
   pid_t r = waitpid(pid, &status, 0); // Wait for child process.
@@ -137,24 +178,60 @@ bool wait_pid(pid_t pid) {
   return false;
 }
 
+bool handle_command_with_pipe(const parsed_obj& obj) {
+  const vector<string>& token = obj.token;
+  int cnt = count(token.begin(), token.end(), "|");
+  if (cnt == 0) {
+    return false;
+  }
+  assert(cnt == 1);
+
+  parsed_obj obj1, obj2;
+  separate_parsed_obj(obj, &obj1, &obj2);
+
+  int fds[2];
+  int st = pipe(fds);
+  if (st == -1) {
+    perror("Pipe failed");
+    exit(-1);
+  }
+
+  int pipe_r = fds[0];
+  int pipe_w = fds[1];
+
+  pid_t pid1 = fork();
+  check_fork_failure(pid1);
+  if (pid1 == 0) {
+    dup_wrap(pipe_w, 1);
+    close_wrap(pipe_r);
+    close_wrap(pipe_w);
+    exec_command(obj1);
+  }
+  pid_t pid2 = fork();
+  check_fork_failure(pid2);
+  if (pid2 == 0) {
+    dup_wrap(pipe_r, 0);
+    close_wrap(pipe_r);
+    close_wrap(pipe_w);
+    exec_command(obj2);
+  }
+  close_files(obj.fdmap);
+  return wait_pid(pid1) && wait_pid(pid2);
+}
+
 bool handle_command(const parsed_obj& obj) {
   if (obj.token.size() == 0) {
     return false;
   }
-  pid_t pid = fork();
-  if (pid < 0) { // When `fork` failed.
-    perror("Fork failed");
-    exit(-1);
+
+  if (handle_command_with_pipe(obj)) {
+    return true;
   }
+
+  pid_t pid = fork();
+  check_fork_failure(pid);
   if (pid == 0) { // For child process.
-    const vector<string>& token = obj.token;
-    const string& command = token[0];
-    char** args = c_str_arr(token);
-    dupall(obj.redirect);
-    execvp(command.c_str(), args);
-    // cerr << strerror(errno);
-    perror("Exec failed");
-    exit(-1);
+    exec_command(obj);
   }
   close_files(obj.fdmap);
   return wait_pid(pid);
