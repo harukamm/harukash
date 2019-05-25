@@ -132,8 +132,9 @@ bool handle_command(const parsed_obj& obj) {
     perror("Fork failed");
     exit(-1);
   } else if (pid == 0) { // For child process.
-    const string& command = obj.token[0];
-    char** args = c_str_arr(obj.token);
+    const vector<string>& token = obj.token;
+    const string& command = token[0];
+    char** args = c_str_arr(token);
     dupall(obj.redirect);
     execvp(command.c_str(), args);
     // cerr << strerror(errno);
