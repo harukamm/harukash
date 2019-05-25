@@ -141,7 +141,6 @@ bool handle_command(const parsed_obj& obj) {
   if (obj.token.size() == 0) {
     return false;
   }
-
   pid_t pid = fork();
   if (pid < 0) { // When `fork` failed.
     perror("Fork failed");
