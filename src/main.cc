@@ -216,6 +216,10 @@ bool handle_command_with_pipe(const parsed_obj& obj) {
     exec_command(obj2);
   }
   close_files(obj.fdmap);
+  // Note: Close pipe otherwise sub process does not end due to blocking read
+  // on pipe.
+  close_wrap(pipe_r);
+  close_wrap(pipe_w);
   return wait_pid(pid1) && wait_pid(pid2);
 }
 
