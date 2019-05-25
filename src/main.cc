@@ -57,7 +57,11 @@ redirect_exp parse_and_open_redirect(const string& s, map<string, int>* m) {
 
 void close_files(const map<string, int>& m) {
   for (const auto &pair: m) {
-    close(pair.second);
+    int st = close(pair.second);
+    if (st == -1) {
+      perror("close failed.");
+      exit(-1);
+    }
   }
 }
 
