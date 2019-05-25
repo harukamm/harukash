@@ -35,49 +35,6 @@ bool is_redirect_token(const string& s) {
   return s.find('<') != string::npos || s.find('>') != string::npos;
 }
 
-CommandData::redirect_pair parse_and_open_redirect(const string& s, map<string, int>* m) {
-  assert(m != nullptr);
-  // Currently only support `1>some-file`
-  smatch results;
-  assert(regex_match(s, results, regex("1?>(\\w+)")));
-  const string& fname = results[1];
-  if (m->find(fname) == m->end()) {
-    m->insert(make_pair(fname, Util::sysopen(fname)));
-  }
-  return (CommandData::redirect_pair){.from=1, .to=m->at(fname)};
-}
-
-void parse(const string& s, CommandData* obj) {
-  char sep = ' ';
-  stringstream ss(s);
-  string item;
-  while (getline(ss, item, sep)) {
-    if (!item.empty()) {
-      if (is_redirect_token(item)) {
-        obj->redirect.push_back(parse_and_open_redirect(item, &obj->fdmap));
-      } else {
-        obj->token.push_back(item);
-      }
-    }
-  }
-}
-
-void separate_command(const CommandData& src, CommandData* dest1,
-    CommandData* dest2) {
-  assert(dest1 != nullptr);
-  assert(dest2 != nullptr);
-
-  auto it = find(src.token.begin(), src.token.end(), "|");
-  copy(src.token.begin(), it, back_inserter(dest1->token));
-  copy(it + 1, src.token.end(), back_inserter(dest2->token));
-
-  copy(src.redirect.begin(), src.redirect.end(), back_inserter(dest1->redirect));
-  copy(src.redirect.begin(), src.redirect.end(), back_inserter(dest2->redirect));
-
-  dest1->fdmap.insert(src.fdmap.begin(), src.fdmap.end());
-  dest2->fdmap.insert(src.fdmap.begin(), src.fdmap.end());
-}
-
 void builtin_echo(const vector<string>& tokens) {
   for (int i = 1; i < tokens.size(); i++) {
     cout << tokens[i];
@@ -112,7 +69,7 @@ bool handle_command_with_pipe(const CommandData& obj) {
   assert(obj.redirect.size() == 0);
 
   CommandData obj1, obj2;
-  separate_command(obj, &obj1, &obj2);
+  obj.separate_command(&obj1, &obj2);
 
   int fds[2];
   Util::syspipe(fds);
@@ -172,7 +129,7 @@ int main() {
     string s;
     getline(cin, s);
     CommandData obj;
-    parse(s, &obj);
+    CommandData::parse_from(s, &obj);
 
     if (obj.token.size() == 0) {
       continue;
