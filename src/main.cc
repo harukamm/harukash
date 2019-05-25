@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <iostream>
+#include <regex>
 #include <sstream>
 #include <stdio.h>
 #include <string>
@@ -9,9 +10,14 @@
 
 using namespace std;
 
+struct redirect_exp {
+  string from;
+  string to;
+};
+
 struct parsed_obj {
   vector<string> token;
-  vector<string> redirect;
+  vector<redirect_exp> redirect;
 };
 
 void print_prompt() {
@@ -23,6 +29,13 @@ bool is_redirect_token(const string& s) {
   return s.find('<') != string::npos || s.find('>') != string::npos;
 }
 
+redirect_exp parse_redirect(const string& s) {
+  // Currently only support `1>some-file`
+  smatch results;
+  assert(regex_match(s, results, regex("1?>(\\w+)")));
+  return (redirect_exp){.from="1", .to=results[1]};
+}
+
 parsed_obj parse(const string& s) {
   char sep = ' ';
   parsed_obj* obj = new parsed_obj();
@@ -31,7 +44,7 @@ parsed_obj parse(const string& s) {
   while (getline(ss, item, sep)) {
     if (!item.empty()) {
       if (is_redirect_token(item)) {
-        obj->redirect.push_back(item);
+        obj->redirect.push_back(parse_redirect(item));
       } else {
         obj->token.push_back(item);
       }
