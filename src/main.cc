@@ -71,11 +71,9 @@ bool handle_command(const vector<string>& tokens) {
   } else if (pid == 0) { // For child process.
     const string& command = tokens[0];
     char** args = c_str_arr(tokens);
-    int st = execvp(command.c_str(), args);
-    if (st == -1) {
-      // cerr << strerror(errno);
-      perror("Exec failed.");
-    }
+    execvp(command.c_str(), args);
+    // cerr << strerror(errno);
+    perror("Exec failed.");
     exit(-1);
   }
 
