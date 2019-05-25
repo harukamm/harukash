@@ -122,6 +122,21 @@ bool handle_builtin(const parsed_obj& obj) {
   return false;
 }
 
+bool wait_pid(pid_t pid) {
+  int status;
+  pid_t r = waitpid(pid, &status, 0); // Wait for child process.
+  if (r < 0) {
+    perror("Waitpid failed");
+    exit(-1);
+  }
+  if (WIFEXITED(status)) { // Child process ends successfully.
+    return true;
+  }
+  cerr << "child status=" << status << endl;
+  perror("child process failed");
+  return false;
+}
+
 bool handle_command(const parsed_obj& obj) {
   if (obj.token.size() == 0) {
     return false;
@@ -141,20 +156,8 @@ bool handle_command(const parsed_obj& obj) {
     perror("Exec failed");
     exit(-1);
   }
-
   close_files(obj.fdmap);
-  int status;
-  pid_t r = waitpid(pid, &status, 0); // Wait for child process.
-  if (r < 0) {
-    perror("Waitpid failed");
-    exit(-1);
-  }
-  if (WIFEXITED(status)) { // Child process ends successfully.
-    return true;
-  }
-  cerr << "child status=" << status << endl;
-  perror("child process failed");
-  return false;
+  return wait_pid(pid);
 }
 
 int main() {
