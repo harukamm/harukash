@@ -37,7 +37,7 @@ bool is_redirect_token(const string& s) {
 int open_wrap(const string& fname) {
   int fd = open(fname.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   if (fd == -1) {
-    perror("open failed.");
+    perror("open failed");
     exit(-1);
   }
   return fd;
@@ -59,7 +59,7 @@ void close_files(const map<string, int>& m) {
   for (const auto &pair: m) {
     int st = close(pair.second);
     if (st == -1) {
-      perror("close failed.");
+      perror("close failed");
       exit(-1);
     }
   }
@@ -69,7 +69,7 @@ void dupall(const vector<redirect_exp>& redirect) {
   for (const auto &r: redirect) {
     int fd = dup2(r.to, r.from);
     if (fd == -1) {
-      perror("dup2 failed.");
+      perror("dup2 failed");
       exit(-1);
     }
   }
@@ -133,7 +133,7 @@ bool handle_command(const parsed_obj& obj) {
 
   pid_t pid = fork();
   if (pid < 0) { // When `fork` failed.
-    perror("Fork failed.");
+    perror("Fork failed");
     exit(-1);
   } else if (pid == 0) { // For child process.
     const string& command = obj.token[0];
@@ -141,7 +141,7 @@ bool handle_command(const parsed_obj& obj) {
     dupall(obj.redirect);
     execvp(command.c_str(), args);
     // cerr << strerror(errno);
-    perror("Exec failed.");
+    perror("Exec failed");
     exit(-1);
   }
 
@@ -149,14 +149,14 @@ bool handle_command(const parsed_obj& obj) {
   int status;
   pid_t r = waitpid(pid, &status, 0); // Wait for child process.
   if (r < 0) {
-    perror("Waitpid failed.");
+    perror("Waitpid failed");
     exit(-1);
   }
   if (WIFEXITED(status)) { // Child process ends successfully.
     return true;
   }
   cerr << "child status=" << status << endl;
-  perror("child process failed.");
+  perror("child process failed");
   return false;
 }
 
