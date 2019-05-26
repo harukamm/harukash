@@ -22,7 +22,9 @@ void CommandList::parse_from(const string& s, CommandList* obj) {
 
 void CommandUnit::parse_from(const string& s, CommandUnit* obj) {
   assert(obj != nullptr);
-  for (const auto& item: Util::split(s, ' ')) {
+  const auto& items = Util::split(s, ' ');
+  assert(items.size() != 0);
+  for (const auto& item: items) {
     if (is_redirect_token(item)) {
       const auto& r = obj->parse_redirect(item);
       obj->redirect.push_back(r);
