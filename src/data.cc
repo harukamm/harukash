@@ -4,12 +4,6 @@
 #include <assert.h>
 #include <regex>
 
-CommandList::~CommandList() {
-  for (const auto& pair: fdmap) {
-    Util::sysclose(pair.second);
-  }
-}
-
 void CommandList::parse_from(const string& s, CommandList* obj) {
   assert(obj != nullptr);
   for (const auto& item: Util::split(s, '|')) {
@@ -51,15 +45,12 @@ void CommandList::maybe_open_file(CommandUnit::file* file) {
   assert(file != nullptr);
   int fd;
   const string& fname = file->fname;
-  auto& m = this->fdmap;
   if (0 <= file->fd) {
     fd = file->fd;
-  } else if (m.find(fname) != m.end()) {
-    fd = m.at(fname);
   } else {
     assert(fname != "");
     fd = Util::sysopen(file->fname);
-    m.insert(make_pair(fname, fd));
+    this->add_to_fdlst(1, fd);
   }
   file->fd = fd;
 }
@@ -70,5 +61,21 @@ void CommandList::open_redirect_files() {
       maybe_open_file(&r.to);
       maybe_open_file(&r.from);
     }
+  }
+}
+
+void CommandList::add_to_fdlst(int size, ...) {
+  va_list args;
+  va_start(args, size);
+  for(int i = 0; i < size; i++) {
+    int fd = va_arg(args, int);
+    fdlst.push_back(fd);
+  }
+  va_end(args);
+}
+
+void CommandList::close_all() {
+  for (const auto& fd: fdlst) {
+    Util::sysclose(fd);
   }
 }

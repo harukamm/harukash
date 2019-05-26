@@ -1,6 +1,5 @@
 #pragma once
 
-#include <map>
 #include <vector>
 #include <string>
 
@@ -38,18 +37,18 @@ class CommandUnit {
 
 class CommandList {
   public:
-    ~CommandList();
-
-    typedef map<string, int> fdmap_t;
-
     vector<CommandUnit> units;
 
     static void parse_from(const string& s, CommandList* obj);
 
     void open_redirect_files();
 
+    void add_to_fdlst(int fds, ...);
+
+    void close_all();
+
   private:
-    fdmap_t fdmap;
+    vector<int> fdlst;
 
     void maybe_open_file(CommandUnit::file* file);
 };
