@@ -30,11 +30,6 @@ void print_prompt() {
   cout << "^_^ > ";
 }
 
-bool is_redirect_token(const string& s) {
-  // TODO: Fix it.
-  return s.find('<') != string::npos || s.find('>') != string::npos;
-}
-
 void builtin_echo(const vector<string>& tokens) {
   for (int i = 1; i < tokens.size(); i++) {
     cout << tokens[i];
