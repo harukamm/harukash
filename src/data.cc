@@ -8,7 +8,6 @@ CommandList::~CommandList() {
   for (const auto& pair: fdmap) {
     Util::sysclose(pair.second);
   }
-// TODO: deconstruc呼ぶのはcaller だけ
 }
 
 void CommandList::parse_from(const string& s, CommandList* obj) {
