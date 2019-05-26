@@ -6,6 +6,7 @@
 #include <sstream>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 vector<string> Util::split(const string& s, char sep) {
   stringstream ss(s);
