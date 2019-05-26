@@ -11,12 +11,13 @@ void CommandData::parse_from(const string& s, CommandData* obj) {
   stringstream ss(s);
   string item;
   while (getline(ss, item, sep)) {
-    if (!item.empty()) {
-      if (is_redirect_token(item)) {
-        obj->parse_and_store_redirect(item);
-      } else {
-        obj->token.push_back(item);
-      }
+    if (item.empty()) {
+      continue;
+    }
+    if (is_redirect_token(item)) {
+      obj->parse_and_store_redirect(item);
+    } else {
+      obj->token.push_back(item);
     }
   }
 }
