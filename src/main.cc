@@ -85,9 +85,6 @@ bool handle_command_with_pipe(const CommandData& obj) {
     Util::sysclose(pipe_w);
     Util::sysexec(obj2.token);
   }
-  for (const auto& pair: obj.fdmap) {
-    Util::sysclose(pair.second);
-  }
   // Note: Close pipe otherwise sub process does not end due to blocking read
   // on pipe.
   Util::sysclose(pipe_r);
@@ -107,12 +104,9 @@ bool handle_command(const CommandData& obj) {
   pid_t pid = Util::sysfork();
   if (pid == 0) { // For child process.
     for (const auto& r: obj.redirect) {
-      Util::sysdup(r.to, r.from);
+      Util::sysdup(r.to.fd, r.from.fd);
     }
     Util::sysexec(obj.token);
-  }
-  for (const auto& pair: obj.fdmap) {
-    Util::sysclose(pair.second);
   }
   return Util::syswaitpid(pid);
 }
@@ -129,6 +123,7 @@ int main() {
     if (obj.token.size() == 0) {
       continue;
     }
+    obj.open_redirect_files();
     if (handle_builtin(obj)) {
       continue;
     }
