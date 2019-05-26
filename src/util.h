@@ -1,5 +1,7 @@
 #pragma once
 
+#include "data.h"
+#include <string>
 #include <vector>
 #include <unistd.h>
 
@@ -7,6 +9,8 @@ using namespace std;
 
 class Util {
   public:
+    static vector<string> split(const string& s, char sep);
+
     static int sysopen(const string& fname);
 
     static void sysclose(int fd);

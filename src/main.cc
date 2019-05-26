@@ -40,31 +40,31 @@ void builtin_echo(const vector<string>& tokens) {
   cout << endl;
 }
 
-bool handle_builtin(const CommandData& obj) {
-  if (obj.token.size() == 0) {
+bool handle_builtin(const CommandList& obj) {
+  if (obj.units.size() != 1) {
     return false;
   }
-  const string& first = obj.token.at(0);
+  const CommandUnit& unit = obj.units.at(0);
+  if (unit.token.size() == 0) {
+    return false;
+  }
+  const string& first = unit.token.at(0);
   if (first == "echo") {
-    assert(obj.redirect.size() == 0);
-    builtin_echo(obj.token);
+    assert(unit.redirect.size() == 0);
+    builtin_echo(unit.token);
     return true;
   }
   return false;
 }
 
-bool handle_command_with_pipe(const CommandData& obj) {
-  const vector<string>& token = obj.token;
-  int cnt = count(token.begin(), token.end(), "|");
-  if (cnt == 0) {
+bool handle_command_with_pipe(const CommandList& obj) {
+  if (obj.units.size() < 2) {
     return false;
   }
-  assert(cnt == 1);
-  // TODO: redirect 先をパイプごとに分けないと
-  assert(obj.redirect.size() == 0);
+  assert(obj.units.size() == 2);
 
-  CommandData obj1, obj2;
-  obj.separate_command(&obj1, &obj2);
+  const auto& obj1 = obj.units.at(0);
+  const auto& obj2 = obj.units.at(1);
 
   int fds[2];
   Util::syspipe(fds);
@@ -92,21 +92,25 @@ bool handle_command_with_pipe(const CommandData& obj) {
   return Util::syswaitpid(pid1) && Util::syswaitpid(pid2);
 }
 
-bool handle_command(const CommandData& obj) {
-  if (obj.token.size() == 0) {
+bool handle_command(const CommandList& obj) {
+  if (obj.units.size() == 0) {
     return false;
   }
-
   if (handle_command_with_pipe(obj)) {
     return true;
   }
 
+  const auto& unit = obj.units.at(0);
+  if (unit.token.size() == 0) {
+    return false;
+  }
+
   pid_t pid = Util::sysfork();
   if (pid == 0) { // For child process.
-    for (const auto& r: obj.redirect) {
+    for (const auto& r: unit.redirect) {
       Util::sysdup(r.to.fd, r.from.fd);
     }
-    Util::sysexec(obj.token);
+    Util::sysexec(unit.token);
   }
   return Util::syswaitpid(pid);
 }
@@ -117,10 +121,10 @@ int main() {
 
     string s;
     getline(cin, s);
-    CommandData obj;
-    CommandData::parse_from(s, &obj);
+    CommandList obj;
+    CommandList::parse_from(s, &obj);
 
-    if (obj.token.size() == 0) {
+    if (obj.units.size() == 0) {
       continue;
     }
     obj.open_redirect_files();

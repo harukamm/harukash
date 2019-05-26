@@ -3,8 +3,22 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <iostream>
+#include <sstream>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+vector<string> Util::split(const string& s, char sep) {
+  stringstream ss(s);
+  string item;
+  vector<string> result;
+  while (getline(ss, item, sep)) {
+    if (item.empty()) {
+      continue;
+    }
+    result.push_back(item);
+  }
+  return result;
+}
 
 int Util::sysopen(const string& fname) {
   int fd = open(fname.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
